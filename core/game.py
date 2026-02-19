@@ -6,11 +6,13 @@ from ui.buttons import Button
 from ui.hud import draw_hud
 from ui.renderer import draw_grid
 from config.settings import *
+from ai.genetic import genetic_algorithm
 
 STATE_MENU = "MENU"
 STATE_COUNTDOWN = "COUNTDOWN"
 STATE_COMPETING = "COMPETING"
 STATE_FINISHED = "FINISHED"
+STATE_CREDITS = "CREDITS"
 
 class Game:
     def __init__(self, screen):
@@ -39,9 +41,10 @@ class Game:
         self.buttons = [
             Button(650, 420, 200, 40, "BFS (Easy)", "BFS"),
             Button(650, 470, 200, 40, "A* (Hard)", "A*"),
-            Button(650, 520, 200, 40, "START GAME", "START_GAME"),
-            Button(650, 570, 200, 40, "RESET", "RESET"),
-            Button(650, 620, 200, 40, "NEW MAP", "NEW_MAP"),
+            Button(650, 520, 200, 40, "GA (Very Hard)", "GA"),
+            Button(650, 570, 200, 40, "START GAME", "START_GAME"),
+            Button(650, 620, 200, 40, "CREDITS", "CREDITS"),
+            Button(650, 670, 200, 40, "RESET", "RESET"),
         ]
 
     def reset(self, algo):
@@ -60,28 +63,36 @@ class Game:
         # Reset game state
         self.algorithm = algo
         self.status = "IDLE"
-        self.phase = "IDLE"
+        self.state = STATE_MENU
         self.winner = None
 
         # Reset timing
         self.last_move_time = 0
 
-
     def plan(self):
-        result = None
 
         if self.algorithm == "BFS":
-            result = bfs(self.ai_agent.position, self.grid.goal, self.grid)
+            result = bfs(self.ai_agent.position,
+                        self.grid.goal,
+                        self.grid)
+
+        elif self.algorithm == "A*":
+            result = astar(self.ai_agent.position,
+                        self.grid.goal,
+                        self.grid)
+
+        elif self.algorithm == "GA":
+            result = genetic_algorithm(self.ai_agent.position,
+                                    self.grid.goal,
+                                    self.grid)
+
         else:
-            result = astar(self.ai_agent.position, self.grid.goal, self.grid)
+            result = None
 
         if result:
             self.ai_path = result["path"]
             self.nodes_expanded = result["expanded"]
             self.ai_time = result["time"]
-        else:
-            self.ai_path = []
-
 
     def handle_click(self, pos):
         for btn in self.buttons:
@@ -103,12 +114,17 @@ class Game:
                 self.original_grid = GridWorld()
                 self.reset(self.algorithm)
 
-            elif btn.action in ["BFS", "A*"]:
+            elif btn.action == "CREDITS":
+                self.state = STATE_CREDITS
+
+            elif btn.action in ["BFS", "A*", "GA"]:
                 self.algorithm = btn.action
                 self.reset(self.algorithm)
 
 
     def update(self):
+        if self.state == STATE_CREDITS:
+            return
 
         # ----------------------
         # COUNTDOWN STATE
@@ -140,6 +156,21 @@ class Game:
         self.last_move_time = now
 
         # AI MOVE
+        # If AI finished and human finished
+        if self.ai_finished and self.human_finished:
+            self.decide_winner()
+            return
+
+        # If AI finished and human has no energy
+        if self.ai_finished and self.human_agent.energy <= 0:
+            self.decide_winner()
+            return
+
+        # If human finished and AI has no path left
+        if self.human_finished and not self.ai_path:
+            self.decide_winner()
+            return
+        
         if not self.ai_finished and self.ai_path:
             self.ai_agent.move(self.ai_path.pop(0), self.grid)
 
@@ -149,21 +180,34 @@ class Game:
             if self.ai_agent.position == self.grid.goal:
                 self.ai_finished = True
 
-        # Check end
-        if self.ai_finished and self.human_finished:
+        # Determine end condition
+        if (
+            (self.ai_finished and self.human_finished) or
+            (self.ai_finished and self.human_agent.energy <= 0) or
+            (self.human_finished and not self.ai_path)
+        ):
             self.decide_winner()
             self.state = STATE_FINISHED
+            return
 
 
 
     def draw(self):
         self.screen.fill(WHITE)
 
+        # -----------------------
+        # CREDITS SCREEN
+        # -----------------------
+        if self.state == STATE_CREDITS:
+            self.draw_credits()
+            return
+
         draw_grid(self.screen, self, self.font)
         draw_hud(self.screen, self, self.font)
 
-        for btn in self.buttons:
-            btn.draw(self.screen, self.font)
+        if self.state in [STATE_MENU, STATE_FINISHED]:
+            for btn in self.buttons:
+                btn.draw(self.screen, self.font)
 
         # COUNTDOWN DISPLAY
         if self.state == STATE_COUNTDOWN:
@@ -183,8 +227,23 @@ class Game:
                 text.get_rect(center=(SCREEN_WIDTH // 2, 100))
             )
 
+        if self.state in [STATE_MENU, STATE_FINISHED]:
+            selected = self.font.render(
+                f"Selected AI: {self.algorithm}",
+                True,
+                BLACK
+            )
+            self.screen.blit(selected, (650, 380))
+
     def handle_key(self, key):
 
+        # ESC should work in credits
+        if self.state == STATE_CREDITS:
+            if key == pygame.K_ESCAPE:
+                self.state = STATE_MENU
+            return
+
+        # Only allow movement during competition
         if self.state != STATE_COMPETING:
             return
 
@@ -220,15 +279,12 @@ class Game:
         # Check terminal conditions AFTER move
         if self.human_agent.energy <= 0:
             self.status = "FAILED"
-            self.human_energy = 0
+            self.human_finished = True
 
         if new_pos == self.grid.goal:
             self.status = "SUCCESS"
             self.human_energy = self.human_agent.energy
             self.human_path_length = len(self.human_agent.path)
-        
-        if self.human_agent.energy <= 0:
-            self.human_finished = True
 
         if self.human_agent.position == self.grid.goal:
             self.human_finished = True
@@ -245,8 +301,43 @@ class Game:
             self.winner = "DRAW"
 
         self.status = self.winner
-        self.phase = "FINISHED"
+        self.state = STATE_FINISHED
 
+    def draw_credits(self):
+
+        big_font = pygame.font.SysFont(None, 50)
+        medium_font = pygame.font.SysFont(None, 36)
+        small_font = pygame.font.SysFont(None, 28)
+
+        y = 100
+
+        title = big_font.render("EnergyQuest", True, BLACK)
+        self.screen.blit(title, title.get_rect(center=(SCREEN_WIDTH // 2, y)))
+
+        y += 80
+
+        lines = [
+            "Artificial Intelligence EECE453",
+            "",
+            "Instructor:",
+            "Dr. Nejib Ben Hadj-Alouane",
+            "",
+            "Developed By:",
+            "Abaan Ahmed",
+            "Mohammed Almheiri",
+            "Younis Almarzooqi",
+            "Sultan Alsalman",
+            "",
+            "American University in Dubai",
+            "Spring 2026",
+            "",
+            "Press ESC to return"
+        ]
+
+        for line in lines:
+            text = medium_font.render(line, True, BLACK)
+            self.screen.blit(text, text.get_rect(center=(SCREEN_WIDTH // 2, y)))
+            y += 40
 
 
 
