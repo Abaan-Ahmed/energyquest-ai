@@ -7,6 +7,11 @@ from ui.hud import draw_hud
 from ui.renderer import draw_grid
 from config.settings import *
 
+STATE_MENU = "MENU"
+STATE_COUNTDOWN = "COUNTDOWN"
+STATE_COMPETING = "COMPETING"
+STATE_FINISHED = "FINISHED"
+
 class Game:
     def __init__(self, screen):
         self.screen = screen
@@ -24,17 +29,19 @@ class Game:
 
         self.algorithm = "A*"
         self.status = "IDLE"
-        self.phase = "IDLE"
+        self.state = STATE_MENU
+        self.countdown_value = 3
+        self.countdown_start = 0
 
         self.last_move_time = 0
         self.move_delay = 350
 
         self.buttons = [
-            Button(650, 420, 200, 40, "START GAME", "START_GAME"),
-            Button(650, 520, 200, 40, "BFS", "BFS"),
-            Button(650, 570, 200, 40, "A*", "A*"),
-            Button(650, 620, 200, 40, "RESET", "RESET"),
-            Button(650, 670, 200, 40, "NEW MAP", "NEW_MAP"),
+            Button(650, 420, 200, 40, "BFS (Easy)", "BFS"),
+            Button(650, 470, 200, 40, "A* (Hard)", "A*"),
+            Button(650, 520, 200, 40, "START GAME", "START_GAME"),
+            Button(650, 570, 200, 40, "RESET", "RESET"),
+            Button(650, 620, 200, 40, "NEW MAP", "NEW_MAP"),
         ]
 
     def reset(self, algo):
@@ -81,11 +88,13 @@ class Game:
             if not btn.is_clicked(pos):
                 continue
 
-            if btn.action == "START_GAME":
+            elif btn.action == "START_GAME":
                 self.reset(self.algorithm)
                 self.plan()
-                self.phase = "COMPETING"
-                self.status = "RUNNING"
+
+                self.state = STATE_COUNTDOWN
+                self.countdown_value = 3
+                self.countdown_start = pygame.time.get_ticks()
 
             elif btn.action == "RESET":
                 self.reset(self.algorithm)
@@ -100,7 +109,28 @@ class Game:
 
 
     def update(self):
-        if self.phase != "COMPETING":
+
+        # ----------------------
+        # COUNTDOWN STATE
+        # ----------------------
+        if self.state == STATE_COUNTDOWN:
+            now = pygame.time.get_ticks()
+
+            if now - self.countdown_start >= 1000:
+                self.countdown_value -= 1
+                self.countdown_start = now
+
+            if self.countdown_value <= 0:
+                self.state = STATE_COMPETING
+                self.last_move_time = pygame.time.get_ticks()
+
+            return
+
+
+        # ----------------------
+        # COMPETING STATE
+        # ----------------------
+        if self.state != STATE_COMPETING:
             return
 
         now = pygame.time.get_ticks()
@@ -109,9 +139,7 @@ class Game:
 
         self.last_move_time = now
 
-        # -------------------------
         # AI MOVE
-        # -------------------------
         if not self.ai_finished and self.ai_path:
             self.ai_agent.move(self.ai_path.pop(0), self.grid)
 
@@ -121,23 +149,43 @@ class Game:
             if self.ai_agent.position == self.grid.goal:
                 self.ai_finished = True
 
-        # -------------------------
-        # CHECK END CONDITION
-        # -------------------------
+        # Check end
         if self.ai_finished and self.human_finished:
             self.decide_winner()
+            self.state = STATE_FINISHED
+
 
 
     def draw(self):
         self.screen.fill(WHITE)
+
         draw_grid(self.screen, self, self.font)
         draw_hud(self.screen, self, self.font)
+
         for btn in self.buttons:
             btn.draw(self.screen, self.font)
 
+        # COUNTDOWN DISPLAY
+        if self.state == STATE_COUNTDOWN:
+            big_font = pygame.font.SysFont(None, 120)
+            text = big_font.render(str(self.countdown_value), True, BLACK)
+            self.screen.blit(
+                text,
+                text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
+            )
+
+        # FINISHED DISPLAY
+        if self.state == STATE_FINISHED:
+            big_font = pygame.font.SysFont(None, 60)
+            text = big_font.render(self.winner, True, RED)
+            self.screen.blit(
+                text,
+                text.get_rect(center=(SCREEN_WIDTH // 2, 100))
+            )
+
     def handle_key(self, key):
 
-        if self.phase != "COMPETING":
+        if self.state != STATE_COMPETING:
             return
 
         # STOP input if game already finished
