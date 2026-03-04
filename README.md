@@ -176,7 +176,7 @@ EnergyQuest/
 ### 1. Clone the repository
 
 ```
-git clone https://github.com/yourusername/energy-quest-ai.git
+git clone https://github.com/Abaan-Ahmed/energyquest-ai
 ```
 
 ### 2. Navigate to project
