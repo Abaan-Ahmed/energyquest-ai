@@ -4,7 +4,7 @@ import time
 from config.settings import MOVE_COST, TRAP_COST, START_ENERGY
 from ai.heuristics import manhattan
 
-MOVES = [(-1,0),(1,0),(0,-1),(0,1)]
+MOVES = [(-1, 0), (1, 0), (0, -1), (0, 1)]
 
 
 # -----------------------------------------
@@ -47,7 +47,7 @@ def bfs(start, goal, grid):
                 "path": path,
                 "energy": energy,
                 "expanded": expanded,
-                "time": time.time() - start_time
+                "time": time.time() - start_time,
             }
 
         state = (pos, energy, collected)
@@ -56,20 +56,16 @@ def bfs(start, goal, grid):
         visited.add(state)
 
         for dx, dy in MOVES:
-            nxt = (pos[0]+dx, pos[1]+dy)
+            nxt = (pos[0] + dx, pos[1] + dy)
 
             if not grid.in_bounds(nxt):
                 continue
             if not grid.is_walkable(nxt):
                 continue
 
-            new_energy, new_collected = apply_energy(
-                nxt, energy, grid, collected
-            )
+            new_energy, new_collected = apply_energy(nxt, energy, grid, collected)
 
-            frontier.append(
-                (nxt, new_energy, new_collected, path + [nxt])
-            )
+            frontier.append((nxt, new_energy, new_collected, path + [nxt]))
 
     return None
 
@@ -83,10 +79,7 @@ def astar(start, goal, grid):
     pq = []
     counter = 0
 
-    heapq.heappush(
-        pq,
-        (0, counter, start, START_ENERGY, frozenset(), [])
-    )
+    heapq.heappush(pq, (0, counter, start, START_ENERGY, frozenset(), []))
 
     visited = set()
     expanded = 0
@@ -103,7 +96,7 @@ def astar(start, goal, grid):
                 "path": path,
                 "energy": energy,
                 "expanded": expanded,
-                "time": time.time() - start_time
+                "time": time.time() - start_time,
             }
 
         state = (pos, energy, collected)
@@ -112,16 +105,14 @@ def astar(start, goal, grid):
         visited.add(state)
 
         for dx, dy in MOVES:
-            nxt = (pos[0]+dx, pos[1]+dy)
+            nxt = (pos[0] + dx, pos[1] + dy)
 
             if not grid.in_bounds(nxt):
                 continue
             if not grid.is_walkable(nxt):
                 continue
 
-            new_energy, new_collected = apply_energy(
-                nxt, energy, grid, collected
-            )
+            new_energy, new_collected = apply_energy(nxt, energy, grid, collected)
 
             if new_energy <= 0:
                 continue
@@ -132,8 +123,7 @@ def astar(start, goal, grid):
 
             counter += 1
             heapq.heappush(
-                pq,
-                (f, counter, nxt, new_energy, new_collected, path + [nxt])
+                pq, (f, counter, nxt, new_energy, new_collected, path + [nxt])
             )
 
     return None

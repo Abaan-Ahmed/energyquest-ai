@@ -1,10 +1,6 @@
 import random
 import time
-from config.settings import (
-    START_ENERGY,
-    MOVE_COST,
-    TRAP_COST
-)
+from config.settings import START_ENERGY, MOVE_COST, TRAP_COST
 
 # ----------------------------------------------------
 # PARAMETERS (TUNEABLE)
@@ -15,12 +11,7 @@ CHROMOSOME_LENGTH = 50
 MUTATION_RATE = 0.15
 ELITE_COUNT = 10
 
-MOVES = [
-    (-1, 0),  # UP
-    (1, 0),   # DOWN
-    (0, -1),  # LEFT
-    (0, 1)    # RIGHT
-]
+MOVES = [(-1, 0), (1, 0), (0, -1), (0, 1)]  # UP  # DOWN  # LEFT  # RIGHT
 
 
 # ----------------------------------------------------
@@ -85,8 +76,7 @@ def genetic_algorithm(start, goal, grid):
 
         # Sort by fitness (descending)
         population.sort(
-            key=lambda chromo: simulate(chromo, start, goal, grid),
-            reverse=True
+            key=lambda chromo: simulate(chromo, start, goal, grid), reverse=True
         )
 
         next_generation = population[:ELITE_COUNT]
@@ -110,8 +100,7 @@ def genetic_algorithm(start, goal, grid):
         population = next_generation
 
     # Get best chromosome
-    best = max(population,
-               key=lambda chromo: simulate(chromo, start, goal, grid))
+    best = max(population, key=lambda chromo: simulate(chromo, start, goal, grid))
 
     # Convert chromosome to actual path
     path = []
@@ -147,5 +136,5 @@ def genetic_algorithm(start, goal, grid):
         "path": path,
         "energy": energy,
         "expanded": POP_SIZE * GENERATIONS,
-        "time": time.time() - start_time
+        "time": time.time() - start_time,
     }

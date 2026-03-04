@@ -8,6 +8,7 @@ GEM = 2
 TRAP = 3
 GOAL = 4
 
+
 class GridWorld:
     def __init__(self):
         self.grid = [[EMPTY for _ in range(GRID_COLS)] for _ in range(GRID_ROWS)]
