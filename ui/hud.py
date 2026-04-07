@@ -92,7 +92,7 @@ def _energy_bar(surf, rect, value, max_val, tick=0, segments=20):
 #  Mini radar map
 # ══════════════════════════════════════════════════════════════
 def _mini_map(surf, game, x, y, w, h, fonts):
-    from core.grid import WALL, GEM, TRAP, GOAL, GEM_A
+    from core.grid import WALL, GEM, TRAP, GOAL, GEM_A, GEM_BOTH
 
     map_rect = pygame.Rect(x, y, w, h)
     _card(surf, map_rect, radius=8, tint=(12, 15, 28))
@@ -110,11 +110,18 @@ def _mini_map(surf, game, x, y, w, h, fonts):
             cx2  = int(ox + c * cw)
             cy2  = int(oy + r * ch)
             rc   = pygame.Rect(cx2, cy2, max(1, int(cw) - 1), max(1, int(ch) - 1))
-            if   cell == WALL:  pygame.draw.rect(surf, WALL_FACE, rc)
-            elif cell == GEM:   pygame.draw.rect(surf, GEM_CORE,   rc)
-            elif cell == GEM_A: pygame.draw.rect(surf, GEM_A_CORE, rc)
-            elif cell == TRAP:  pygame.draw.rect(surf, TRAP_CORE,  rc)
-            elif cell == GOAL:  pygame.draw.rect(surf, GOAL_CORE,  rc)
+            if   cell == WALL:     pygame.draw.rect(surf, WALL_FACE,  rc)
+            elif cell == GEM:      pygame.draw.rect(surf, GEM_CORE,   rc)
+            elif cell == GEM_A:    pygame.draw.rect(surf, GEM_A_CORE, rc)
+            elif cell == GEM_BOTH:
+                # Left half gold, right half purple
+                half = max(1, rc.w // 2)
+                pygame.draw.rect(surf, GEM_CORE,
+                                 pygame.Rect(rc.x, rc.y, half, rc.h))
+                pygame.draw.rect(surf, GEM_A_CORE,
+                                 pygame.Rect(rc.x + half, rc.y, rc.w - half, rc.h))
+            elif cell == TRAP:     pygame.draw.rect(surf, TRAP_CORE,  rc)
+            elif cell == GOAL:     pygame.draw.rect(surf, GOAL_CORE,  rc)
 
     for agent, col in [(game.human_agent, H_CORE), (game.ai_agent, A_CORE)]:
         ar, ac = agent.position
@@ -255,7 +262,7 @@ def _panel_menu(screen, game, fonts, px, py, pw):
             btn.update_hover(pygame.mouse.get_pos())
             btn.draw(screen, f_n, selected=(btn.action == game.algorithm))
 
-    y = py + 60
+    y = py + 82
 
     descs = {
         "BFS": ("Breadth-First Search",
@@ -276,10 +283,11 @@ def _panel_menu(screen, game, fonts, px, py, pw):
     screen.blit(f_s.render(d2,    True, HUD_MUTED), (px + 12, y + 52))
     y += 92
 
-    # Updated legend — shows both gem types
+    # Updated legend — shows paired gem tiles and solo states
     legend = [
-        (GEM_CORE,    "Gold gem  — yours only (+energy)"),
-        (GEM_A_CORE,  "Purple gem — AI only  (+energy)"),
+        (GEM_CORE,    "Gold+Purple — paired start tile"),
+        (GEM_A_CORE,  "Purple only — AI gem remaining"),
+        (GEM_CORE,    "Gold only   — your gem remaining"),
         (TRAP_BRIGHT, "Trap   — penalises anyone"),
         (GOAL_CORE,   "Goal   — reach to finish"),
     ]
